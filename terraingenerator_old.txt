@@ -1,0 +1,428 @@
+#include "terraingenerator.h"
+#include <QtMath>
+#include <QPainter>
+#include <QTimer>  // Add this include
+
+TerrainGenerator::TerrainGenerator(int w, int h) 
+    : m_width(w)
+    , m_height(h)
+    , m_pointCount(20)
+    , m_horizontalStretch(1.0f)
+    , m_noiseFrequency(1.0f)
+    , m_noiseAmplitude(1.0f)
+{
+    m_baseRadius = qMin(m_width, m_height) / 3;
+    regenerateCavePositions();  // Initialize cave positions
+}
+
+void TerrainGenerator::setPointCount(int count) {
+    if (m_pointCount != count) {
+        m_pointCount = count;
+        emit pointCountChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setBaseRadius(int radius) {
+    if (m_baseRadius != radius) {
+        m_baseRadius = radius;
+        emit baseRadiusChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setHorizontalStretch(float stretch) {
+    if (m_horizontalStretch != stretch) {
+        m_horizontalStretch = stretch;
+        emit horizontalStretchChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setNoiseFrequency(float freq) {
+    if (m_noiseFrequency != freq) {
+        m_noiseFrequency = freq;
+        emit noiseFrequencyChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setNoiseAmplitude(float amp) {
+    if (m_noiseAmplitude != amp) {
+        m_noiseAmplitude = amp;
+        emit noiseAmplitudeChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setBlobCount(int count) {
+    if (m_blobCount != count) {
+        m_blobCount = count;
+        // Regenerate caves when blob count changes
+        regenerateCavePositions();
+        emit blobCountChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setBlobSpacing(float spacing) {
+    if (m_blobSpacing != spacing) {
+        m_blobSpacing = spacing;
+        emit blobSpacingChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setCavesEnabled(bool enabled) {
+    if (m_cavesEnabled != enabled) {
+        m_cavesEnabled = enabled;
+        if (enabled) {
+            // When enabling caves, regenerate them
+            regenerateCavePositions();
+        } else {
+            // When disabling caves, just clear the vector
+            m_caves.clear();
+        }
+        emit cavesEnabledChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setCaveScale(float scale) {
+    if (m_caveScale != scale) {
+        m_caveScale = scale;
+        emit caveScaleChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setCaveNoiseFrequency(float freq) {
+    if (m_caveNoiseFrequency != freq) {
+        m_caveNoiseFrequency = freq;
+        emit caveNoiseFrequencyChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setCaveNoiseAmplitude(float amp) {
+    if (m_caveNoiseAmplitude != amp) {
+        m_caveNoiseAmplitude = amp;
+        emit caveNoiseAmplitudeChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setCaveCount(int count) {
+    if (m_caveCount != count) {
+        int oldCount = m_caveCount;
+        m_caveCount = count;
+
+        if (count > oldCount) {
+            // Generate only the new caves while preserving existing ones
+            for (int i = oldCount; i < count; i++) {
+                Cave cave;
+                int minX = static_cast<int>(m_width * 0.2f);
+                int maxX = static_cast<int>(m_width * 0.8f);
+                int minY = static_cast<int>(m_height * 0.3f);
+                int maxY = static_cast<int>(m_height * 0.7f);
+                
+                cave.position = QPointF(
+                    QRandomGenerator::global()->bounded(minX, maxX),
+                    QRandomGenerator::global()->bounded(minY, maxY)
+                );
+                cave.rotation = QRandomGenerator::global()->generateDouble() * 2.0 * M_PI;
+                cave.scaleVariant = 0.8f + (QRandomGenerator::global()->generateDouble() * 0.4f);
+                cave.noiseOffset = QRandomGenerator::global()->generateDouble() * 10.0f;
+                
+                m_caves.append(cave);
+            }
+        } else {
+            while (m_caves.size() > count) {
+                m_caves.removeLast();
+            }
+        }
+
+        if (m_selectedCaveIndex >= m_caves.size()) {
+            m_selectedCaveIndex = m_caves.isEmpty() ? -1 : m_caves.size() - 1;
+            emit selectedCaveIndexChanged();
+        }
+
+        emit caveCountChanged();
+        emit terrainUpdated();
+        
+        // Force immediate repaint through event loop
+        QTimer::singleShot(0, this, [this]() {
+            emit terrainUpdated();
+        });
+    }
+}
+
+void TerrainGenerator::setCavePointCount(int count) {
+    if (m_cavePointCount != count) {
+        m_cavePointCount = count;
+        emit cavePointCountChanged();
+        emit terrainUpdated();
+    }
+}
+
+void TerrainGenerator::setSelectedCaveIndex(int index) {
+    if (m_selectedCaveIndex != index && index >= -1 && index < m_caves.size()) {
+        m_selectedCaveIndex = index;
+        // Ensure the UI updates before any other operations
+        emit selectedCaveIndexChanged();
+        emit selectedCavePropertiesChanged();
+        emit terrainUpdated();  // Add this to force immediate terrain update
+    }
+}
+
+QVariantMap TerrainGenerator::getSelectedCaveProperties() const {
+    QVariantMap props;
+    if (m_selectedCaveIndex >= 0 && m_selectedCaveIndex < m_caves.size()) {
+        const Cave& cave = m_caves[m_selectedCaveIndex];
+        props["scale"] = cave.scaleVariant;
+        props["rotation"] = cave.rotation;
+        props["noiseOffset"] = cave.noiseOffset;
+    }
+    return props;
+}
+
+void TerrainGenerator::updateSelectedCave(float scale, float rotation, float noiseOffset) {
+    if (m_selectedCaveIndex >= 0 && m_selectedCaveIndex < m_caves.size()) {
+        Cave& cave = m_caves[m_selectedCaveIndex];
+        cave.scaleVariant = scale;
+        cave.rotation = rotation;
+        cave.noiseOffset = noiseOffset;
+        emit terrainUpdated();
+        emit selectedCavePropertiesChanged();
+    }
+}
+
+QImage TerrainGenerator::generateTerrain() {
+    QImage terrain(m_width, m_height, QImage::Format_ARGB32);
+    terrain.fill(Qt::transparent);
+    drawMultiBlob(terrain);
+    return terrain;
+}
+
+void TerrainGenerator::drawBlob(QImage &image) {
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setBrush(Qt::black);
+    painter.setPen(Qt::NoPen);
+
+    int centerX = m_width / 2;
+    int centerY = m_height / 2;
+
+    QPolygonF blob;
+    for (int i = 0; i < m_pointCount; i++) {
+        float angle = (2 * M_PI * i) / m_pointCount;
+        
+        // Use Perlin noise for radius variation
+        float noiseX = qCos(angle) * m_noiseFrequency;
+        float noiseY = qSin(angle) * m_noiseFrequency;
+        float variation = noise2D(noiseX, noiseY) * m_noiseAmplitude * m_baseRadius * 0.5f;
+        
+        float radius = m_baseRadius + variation;
+        float x = centerX + (radius * qCos(angle) * m_horizontalStretch);
+        float y = centerY + radius * qSin(angle);
+        blob << QPointF(x, y);
+    }
+
+    painter.drawPolygon(blob);
+}
+
+void TerrainGenerator::drawMultiBlob(QImage &image) {
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    
+    // Draw main surface blobs
+    painter.setBrush(Qt::black);
+    painter.setPen(Qt::NoPen);
+    
+    // Calculate total width needed for all blobs
+    float totalWidth = (m_blobCount - 1) * m_baseRadius * m_blobSpacing;
+    float startX = (m_width - totalWidth) / 2;
+    
+    // Draw the main blobs
+    for (int i = 0; i < m_blobCount; i++) {
+        float xPos = startX + (i * m_baseRadius * m_blobSpacing);
+        QPointF center(xPos, m_height/2);
+        
+        QPolygonF blob;
+        for (int j = 0; j < m_pointCount; j++) {
+            float angle = (2 * M_PI * j) / m_pointCount;
+            float noiseX = (qCos(angle) + i) * m_noiseFrequency;
+            float noiseY = qSin(angle) * m_noiseFrequency;
+            float variation = noise2D(noiseX, noiseY) * m_noiseAmplitude * m_baseRadius * 0.5f;
+            
+            float radius = m_baseRadius + variation;
+            float x = center.x() + (radius * qCos(angle) * m_horizontalStretch);
+            float y = center.y() + radius * qSin(angle);
+            blob << QPointF(x, y);
+        }
+        painter.drawPolygon(blob);
+    }
+    
+    if (m_cavesEnabled && !m_caves.isEmpty()) {
+        painter.setCompositionMode(QPainter::CompositionMode_Clear);
+        painter.setBrush(Qt::white);
+        painter.setPen(Qt::NoPen);
+        
+        for (const Cave& cave : m_caves) {
+            QPolygonF caveBlob;
+            // Base scale affected by both global and individual scale
+            float caveRadius = m_baseRadius * m_caveScale * cave.scaleVariant;
+            
+            for (int j = 0; j < m_cavePointCount; j++) {
+                // Apply individual cave rotation
+                float angle = (2 * M_PI * j) / m_cavePointCount + cave.rotation;
+                // Use individual noise offset for each cave
+                float noiseX = qCos(angle) * m_caveNoiseFrequency + cave.noiseOffset;
+                float noiseY = qSin(angle) * m_caveNoiseFrequency + cave.noiseOffset;
+                float variation = noise2D(noiseX, noiseY) * m_caveNoiseAmplitude * caveRadius * 0.5f;
+                
+                float radius = caveRadius + variation;
+                float x = cave.position.x() + radius * qCos(angle);
+                float y = cave.position.y() + radius * qSin(angle);
+                caveBlob << QPointF(x, y);
+            }
+            painter.drawPolygon(caveBlob);
+        }
+    }
+    painter.end();
+}
+
+void TerrainGenerator::subtractBlob(QImage &image, const QPointF& center) {
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setCompositionMode(QPainter::CompositionMode_Clear);
+    painter.setBrush(Qt::white);
+    painter.setPen(Qt::NoPen);
+
+    QPolygonF blob;
+    float caveRadius = m_baseRadius * 0.3f;
+    
+    for (int i = 0; i < m_pointCount; i++) {
+        float angle = (2 * M_PI * i) / m_pointCount;
+        
+        float noiseX = qCos(angle) * m_noiseFrequency * 2;
+        float noiseY = qSin(angle) * m_noiseFrequency * 2;
+        float variation = noise2D(noiseX, noiseY) * m_noiseAmplitude * caveRadius * 0.5f;
+        
+        float radius = caveRadius + variation;
+        float x = center.x() + radius * qCos(angle);
+        float y = center.y() + radius * qSin(angle);
+        blob << QPointF(x, y);
+    }
+    
+    painter.drawPolygon(blob);
+    painter.end(); // Explicitly end the painter
+}
+
+// Modify regenerateCavePositions to only regenerate if caves vector is empty
+void TerrainGenerator::regenerateCavePositions() {
+    if (!m_cavesEnabled || !m_caves.isEmpty()) {
+        return;
+    }
+
+    // Only generate caves if none exist
+    for (int i = 0; i < m_caveCount; i++) {
+        Cave cave;
+        int minX = static_cast<int>(m_width * 0.2f);
+        int maxX = static_cast<int>(m_width * 0.8f);
+        int minY = static_cast<int>(m_height * 0.3f);
+        int maxY = static_cast<int>(m_height * 0.7f);
+        
+        cave.position = QPointF(
+            QRandomGenerator::global()->bounded(minX, maxX),
+            QRandomGenerator::global()->bounded(minY, maxY)
+        );
+        cave.rotation = QRandomGenerator::global()->generateDouble() * 2.0 * M_PI;
+        cave.scaleVariant = 0.8f + (QRandomGenerator::global()->generateDouble() * 0.4f);
+        cave.noiseOffset = QRandomGenerator::global()->generateDouble() * 10.0f;
+        
+        m_caves.append(cave);
+    }
+    emit terrainUpdated();
+}
+
+void TerrainGenerator::regenerateSelectedCavePosition() {
+    if (m_selectedCaveIndex >= 0 && m_selectedCaveIndex < m_caves.size()) {
+        Cave& cave = m_caves[m_selectedCaveIndex];
+        
+        int minX = static_cast<int>(m_width * 0.2f);
+        int maxX = static_cast<int>(m_width * 0.8f);
+        int minY = static_cast<int>(m_height * 0.3f);
+        int maxY = static_cast<int>(m_height * 0.7f);
+        
+        cave.position = QPointF(
+            QRandomGenerator::global()->bounded(minX, maxX),
+            QRandomGenerator::global()->bounded(minY, maxY)
+        );
+
+        // Emit signals in this order to ensure proper update chain
+        emit selectedCavePropertiesChanged();
+        emit terrainUpdated();
+        
+        // Force an immediate repaint
+        QTimer::singleShot(0, this, [this]() {
+            emit terrainUpdated();
+        });
+    }
+}
+
+float TerrainGenerator::noise2D(float x, float y) {
+    // Implementation of 2D Perlin noise
+    static const unsigned char permutation[256] = {
+        151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,
+        140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,
+        247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,
+        57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,
+        74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,
+        60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,
+        65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,
+        200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,
+        52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,
+        207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,
+        119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,
+        129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,
+        218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,
+        81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,
+        184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,
+        222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+    };
+
+    int X = static_cast<int>(floor(x)) & 255;
+    int Y = static_cast<int>(floor(y)) & 255;
+    x -= floor(x);
+    y -= floor(y);
+
+    float u = fade(x);
+    float v = fade(y);
+
+    int A = permutation[X] + Y;
+    int B = permutation[X + 1] + Y;
+
+    return lerp(v, 
+        lerp(u, grad(permutation[A], x, y), 
+                grad(permutation[B], x - 1, y)),
+        lerp(u, grad(permutation[A + 1], x, y - 1),
+                grad(permutation[B + 1], x - 1, y - 1)));
+}
+
+float TerrainGenerator::fade(float t) {
+    // Fade function as defined by Ken Perlin
+    return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+float TerrainGenerator::lerp(float t, float a, float b) {
+    return a + t * (b - a);
+}
+
+float TerrainGenerator::grad(int hash, float x, float y) {
+    // Convert low 4 bits of hash code into 12 gradient directions
+    int h = hash & 15;
+    float u = h < 8 ? x : y;
+    float v = h < 4 ? y : h == 12 || h == 14 ? x : 0;
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+}
