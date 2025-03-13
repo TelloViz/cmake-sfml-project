@@ -6,10 +6,10 @@
 TerrainGenerator::TerrainGenerator(unsigned int w, unsigned int h) 
     : m_width(w)
     , m_height(h)
-    , m_terrainTexture()  // Default construct the RenderTexture
+    , m_terrainTexture(sf::Vector2u{w, h})  // Construct RenderTexture directly with size
 {
     m_baseRadius = std::min(m_width, m_height) / 3;
-    // No create() needed - RenderTexture is ready to use after construction
+    m_terrainTexture->clear(sf::Color::Transparent);
     regenerateCavePositions();
 }
 
@@ -166,10 +166,10 @@ void TerrainGenerator::updateSelectedCave(float scale, float rotation, float noi
 }
 
 sf::RenderTexture& TerrainGenerator::generateTerrain() {
-    m_terrainTexture.clear(sf::Color::Transparent);
-    drawMultiBlob(m_terrainTexture);
-    m_terrainTexture.display();
-    return m_terrainTexture;
+    m_terrainTexture->clear(sf::Color::Transparent);
+    drawMultiBlob(*m_terrainTexture);
+    m_terrainTexture->display(); // Make sure to call display()
+    return *m_terrainTexture;
 }
 
 void TerrainGenerator::drawBlob(sf::RenderTexture& target) {

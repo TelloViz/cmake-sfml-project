@@ -92,7 +92,7 @@ private:
     int m_cavePointCount{20};
     std::vector<Cave> m_caves;
     int m_selectedCaveIndex{-1};
-    sf::RenderTexture m_terrainTexture;
+    std::optional<sf::RenderTexture> m_terrainTexture;
     std::mt19937 m_rng{std::random_device{}()};
     UpdateCallback m_updateCallback;
 };

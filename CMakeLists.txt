@@ -31,5 +31,23 @@ FetchContent_Declare(ImGui-SFML
     SYSTEM)
 FetchContent_MakeAvailable(ImGui-SFML)
 
-add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE SFML::Graphics ImGui-SFML::ImGui-SFML)
+# Add source files
+set(SOURCES 
+    src/main.cpp
+    src/TerrainGenerator.cpp
+)
+
+# Create executable with all sources
+add_executable(main ${SOURCES})
+
+# Add include directories
+target_include_directories(main PRIVATE 
+    ${CMAKE_SOURCE_DIR}/include
+    #${IMGUI_DIR}
+)
+
+# Link libraries
+target_link_libraries(main PRIVATE 
+    SFML::Graphics 
+    ImGui-SFML::ImGui-SFML
+)
