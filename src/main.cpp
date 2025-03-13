@@ -82,7 +82,7 @@ int main() {
             }
         }
 
-        // Cave controls (single section)
+        // Cave controls
         if (ImGui::CollapsingHeader("Cave System")) {
             bool cavesEnabled = terrainGen.getCavesEnabled();
             if (ImGui::Checkbox("Enable Caves", &cavesEnabled)) {
@@ -90,13 +90,19 @@ int main() {
             }
 
             if (cavesEnabled) {
+                // Global cave parameters
                 int caveCount = terrainGen.getCaveCount();
                 if (ImGui::SliderInt("Cave Count", &caveCount, 0, 10)) {
                     terrainGen.setCaveCount(caveCount);
                 }
 
+                int cavePointCount = terrainGen.getCavePointCount();
+                if (ImGui::SliderInt("Cave Point Count", &cavePointCount, 3, 100)) {
+                    terrainGen.setCavePointCount(cavePointCount);
+                }
+
                 float caveScale = terrainGen.getCaveScale();
-                if (ImGui::SliderFloat("Cave Scale", &caveScale, 0.1f, 1.0f)) {
+                if (ImGui::SliderFloat("Global Cave Scale", &caveScale, 0.1f, 1.0f)) {
                     terrainGen.setCaveScale(caveScale);
                 }
 
@@ -110,7 +116,8 @@ int main() {
                     terrainGen.setCaveNoiseAmplitude(caveNoiseAmp);
                 }
 
-                if (ImGui::TreeNode("Edit Individual Caves")) {
+                // Individual cave editing
+                if (ImGui::TreeNode("Edit Individual Cave")) {
                     int selectedCave = terrainGen.getSelectedCaveIndex();
                     if (ImGui::SliderInt("Selected Cave", &selectedCave, -1, caveCount - 1)) {
                         terrainGen.setSelectedCaveIndex(selectedCave);
@@ -123,8 +130,8 @@ int main() {
                         float noiseOffset = cave.noiseOffset;
 
                         bool modified = false;
-                        modified |= ImGui::SliderFloat("Cave Scale", &scale, 0.5f, 2.0f);
-                        modified |= ImGui::SliderAngle("Cave Rotation", &rotation);
+                        modified |= ImGui::SliderFloat("Individual Scale", &scale, 0.5f, 2.0f);
+                        modified |= ImGui::SliderAngle("Rotation", &rotation);
                         modified |= ImGui::SliderFloat("Noise Offset", &noiseOffset, 0.0f, 10.0f);
 
                         if (modified) {
