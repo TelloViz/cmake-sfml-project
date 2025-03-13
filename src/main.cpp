@@ -128,6 +128,33 @@ int main() {
             }
         }
 
+        // Blob controls
+        if (ImGui::CollapsingHeader("Blob Controls")) {
+            int blobCount = terrainGen.getBlobCount();
+            if (ImGui::SliderInt("Blob Count", &blobCount, 1, 10)) {
+                terrainGen.setBlobCount(blobCount);
+            }
+
+            float blobSpacing = terrainGen.getBlobSpacing();
+            if (ImGui::SliderFloat("Blob Spacing", &blobSpacing, 0.5f, 3.0f)) {
+                terrainGen.setBlobSpacing(blobSpacing);
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Cave Controls")) {
+            bool cavesEnabled = terrainGen.getCavesEnabled();
+            if (ImGui::Checkbox("Enable Caves", &cavesEnabled)) {
+                terrainGen.setCavesEnabled(cavesEnabled);
+            }
+
+            if (cavesEnabled) {
+                int caveCount = terrainGen.getCaveCount();
+                if (ImGui::SliderInt("Cave Count", &caveCount, 0, 10)) {
+                    terrainGen.setCaveCount(caveCount);
+                }
+            }
+        }
+
         ImGui::End();
 
         // Render

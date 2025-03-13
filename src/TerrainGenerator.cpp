@@ -6,10 +6,12 @@
 TerrainGenerator::TerrainGenerator(unsigned int w, unsigned int h) 
     : m_width(w)
     , m_height(h)
-    , m_terrainTexture(sf::Vector2u{w, h})  // Construct RenderTexture directly with size
+    , m_terrainTexture(sf::Vector2u{w, h})  // Direct construction
 {
     m_baseRadius = std::min(m_width, m_height) / 3;
-    m_terrainTexture->clear(sf::Color::Transparent);
+    m_terrainTexture.clear(sf::Color::Transparent);  // Use . instead of ->
+    m_blobCount = 1;  // Initialize blob count
+    m_caveCount = 0;  // Initialize cave count
     regenerateCavePositions();
 }
 
@@ -101,30 +103,28 @@ void TerrainGenerator::setCaveCount(int count) {
         int oldCount = m_caveCount;
         m_caveCount = count;
 
-        if (count > oldCount) {
-            // Generate only the new caves while preserving existing ones
-            for (int i = oldCount; i < count; i++) {
-                Cave cave;
-                int minX = static_cast<int>(m_width * 0.2f);
-                int maxX = static_cast<int>(m_width * 0.8f);
-                int minY = static_cast<int>(m_height * 0.3f);
-                int maxY = static_cast<int>(m_height * 0.7f);
-                
-                std::uniform_int_distribution<int> xDist(minX, maxX);
-                std::uniform_int_distribution<int> yDist(minY, maxY);
-                std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * static_cast<float>(M_PI));
-                std::uniform_real_distribution<float> scaleDist(0.8f, 1.2f);
-                std::uniform_real_distribution<float> noiseDist(0.0f, 10.0f);
-                
-                cave.position = sf::Vector2f(xDist(m_rng), yDist(m_rng));
-                cave.rotation = angleDist(m_rng);
-                cave.scaleVariant = scaleDist(m_rng);
-                cave.noiseOffset = noiseDist(m_rng);
-                
-                m_caves.push_back(cave);
-            }
-        } else {
-            m_caves.resize(count);
+        // Always regenerate caves when count changes
+        m_caves.clear();  // Clear existing caves
+        
+        for (int i = 0; i < count; i++) {
+            Cave cave;
+            int minX = static_cast<int>(m_width * 0.2f);
+            int maxX = static_cast<int>(m_width * 0.8f);
+            int minY = static_cast<int>(m_height * 0.3f);
+            int maxY = static_cast<int>(m_height * 0.7f);
+            
+            std::uniform_int_distribution<int> xDist(minX, maxX);
+            std::uniform_int_distribution<int> yDist(minY, maxY);
+            std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * static_cast<float>(M_PI));
+            std::uniform_real_distribution<float> scaleDist(0.8f, 1.2f);
+            std::uniform_real_distribution<float> noiseDist(0.0f, 10.0f);
+            
+            cave.position = sf::Vector2f(xDist(m_rng), yDist(m_rng));
+            cave.rotation = angleDist(m_rng);
+            cave.scaleVariant = scaleDist(m_rng);
+            cave.noiseOffset = noiseDist(m_rng);
+            
+            m_caves.push_back(cave);
         }
 
         if (m_selectedCaveIndex >= m_caves.size()) {
@@ -166,10 +166,10 @@ void TerrainGenerator::updateSelectedCave(float scale, float rotation, float noi
 }
 
 sf::RenderTexture& TerrainGenerator::generateTerrain() {
-    m_terrainTexture->clear(sf::Color::Transparent);
-    drawMultiBlob(*m_terrainTexture);
-    m_terrainTexture->display(); // Make sure to call display()
-    return *m_terrainTexture;
+    m_terrainTexture.clear(sf::Color::Transparent);  // Use . instead of ->
+    drawMultiBlob(m_terrainTexture);  // Pass direct reference
+    m_terrainTexture.display();
+    return m_terrainTexture;
 }
 
 void TerrainGenerator::drawBlob(sf::RenderTexture& target) {
@@ -201,8 +201,8 @@ void TerrainGenerator::drawMultiBlob(sf::RenderTexture& target) {
     float totalWidth = (m_blobCount - 1) * m_baseRadius * m_blobSpacing;
     float startX = (m_width - totalWidth) / 2.0f;
     
-    // Draw main surface blobs
-    for (int i = 0; i < m_blobCount; i++) {
+    // Draw main surface blobs - always draw at least one blob
+    for (int i = 0; i < std::max(1, m_blobCount); i++) {
         float xPos = startX + (i * m_baseRadius * m_blobSpacing);
         sf::Vector2f center(xPos, m_height/2.0f);
         
@@ -227,11 +227,11 @@ void TerrainGenerator::drawMultiBlob(sf::RenderTexture& target) {
     }
     
     if (m_cavesEnabled && !m_caves.empty()) {
-        // Create stencil for cave cutouts
+        // Create stencil for cave cutouts with correct blend mode
         sf::RenderStates cutoutState;
         cutoutState.blendMode = sf::BlendMode(
-            sf::BlendMode::Factor::DstColor,  // Replace Zero
-            sf::BlendMode::Factor::OneMinusSrcColor  // Replace One
+            sf::BlendMode::Factor::DstColor,
+            sf::BlendMode::Factor::OneMinusSrcColor
         );
         
         for (const Cave& cave : m_caves) {
