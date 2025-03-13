@@ -103,28 +103,32 @@ void TerrainGenerator::setCaveCount(int count) {
         int oldCount = m_caveCount;
         m_caveCount = count;
 
-        // Always regenerate caves when count changes
-        m_caves.clear();  // Clear existing caves
-        
-        for (int i = 0; i < count; i++) {
-            Cave cave;
-            int minX = static_cast<int>(m_width * 0.2f);
-            int maxX = static_cast<int>(m_width * 0.8f);
-            int minY = static_cast<int>(m_height * 0.3f);
-            int maxY = static_cast<int>(m_height * 0.7f);
-            
-            std::uniform_int_distribution<int> xDist(minX, maxX);
-            std::uniform_int_distribution<int> yDist(minY, maxY);
-            std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * static_cast<float>(M_PI));
-            std::uniform_real_distribution<float> scaleDist(0.8f, 1.2f);
-            std::uniform_real_distribution<float> noiseDist(0.0f, 10.0f);
-            
-            cave.position = sf::Vector2f(xDist(m_rng), yDist(m_rng));
-            cave.rotation = angleDist(m_rng);
-            cave.scaleVariant = scaleDist(m_rng);
-            cave.noiseOffset = noiseDist(m_rng);
-            
-            m_caves.push_back(cave);
+        // If increasing count, only generate new caves
+        if (count > oldCount) {
+            // Generate only the new caves while preserving existing ones
+            for (int i = oldCount; i < count; i++) {
+                Cave cave;
+                int minX = static_cast<int>(m_width * 0.2f);
+                int maxX = static_cast<int>(m_width * 0.8f);
+                int minY = static_cast<int>(m_height * 0.3f);
+                int maxY = static_cast<int>(m_height * 0.7f);
+                
+                std::uniform_int_distribution<int> xDist(minX, maxX);
+                std::uniform_int_distribution<int> yDist(minY, maxY);
+                std::uniform_real_distribution<float> angleDist(0.0f, 2.0f * static_cast<float>(M_PI));
+                std::uniform_real_distribution<float> scaleDist(0.8f, 1.2f);
+                std::uniform_real_distribution<float> noiseDist(0.0f, 10.0f);
+                
+                cave.position = sf::Vector2f(xDist(m_rng), yDist(m_rng));
+                cave.rotation = angleDist(m_rng);
+                cave.scaleVariant = scaleDist(m_rng);
+                cave.noiseOffset = noiseDist(m_rng);
+                
+                m_caves.push_back(cave);
+            }
+        } else {
+            // If reducing count, just remove caves from the end
+            m_caves.resize(count);
         }
 
         if (m_selectedCaveIndex >= m_caves.size()) {
