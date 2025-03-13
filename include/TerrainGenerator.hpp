@@ -19,6 +19,16 @@ public:
         float noiseOffset;   // Offset for noise sampling
     };
 
+    struct TerrainStats {
+        uint32_t visibleTerrainPixels{0};  // Black pixels not covered by caves
+        float terrainCoverage{0.0f};       // Percentage of screen that is visible terrain
+    };
+
+    struct ExportSettings {
+        bool transparentBackground{false};
+        bool transparentCaves{false};
+    };
+
     explicit TerrainGenerator(unsigned int width, unsigned int height);
 
     // Main generation method
@@ -64,6 +74,16 @@ public:
     Cave getSelectedCaveProperties() const;
     void regenerateCavePositions();
     void regenerateSelectedCavePosition();
+
+    TerrainStats calculateStats() const;
+
+    // Save the terrain to a file
+    bool saveToFile(const std::string& filename) const;
+    bool saveToFile(const std::string& filename, bool transparentBg) const;
+    bool saveToFile(const std::string& filename, const ExportSettings& settings) const;
+    
+    // Optional: Get raw bitmap data for direct game engine usage
+    std::vector<uint8_t> getTerrainData() const;
 
 private:
     void drawBlob(sf::RenderTexture& target);

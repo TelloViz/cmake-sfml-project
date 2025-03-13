@@ -392,3 +392,77 @@ float TerrainGenerator::grad(int hash, float x, float y) {
     float v = h < 4 ? y : h == 12 || h == 14 ? x : 0;
     return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 }
+
+TerrainGenerator::TerrainStats TerrainGenerator::calculateStats() const {
+    TerrainStats stats;
+    
+    // Get the final rendered image
+    sf::Image image = m_terrainTexture.getTexture().copyToImage();
+    
+    // Count visible black pixels (terrain)
+    for (unsigned int y = 0; y < m_height; y++) {
+        for (unsigned int x = 0; x < m_width; x++) {
+            // In SFML 3.0, getPixel takes a Vector2u
+            if (image.getPixel(sf::Vector2u{x, y}) == sf::Color(0, 0, 0)) {
+                stats.visibleTerrainPixels++;
+            }
+        }
+    }
+    
+    // Calculate percentage of screen covered by visible terrain
+    float totalPixels = static_cast<float>(m_width * m_height);
+    stats.terrainCoverage = (stats.visibleTerrainPixels / totalPixels) * 100.0f;
+    
+    return stats;
+}
+
+bool TerrainGenerator::saveToFile(const std::string& filename, const ExportSettings& settings) const {
+    sf::Image image = m_terrainTexture.getTexture().copyToImage();
+    
+    for (unsigned int y = 0; y < m_height; y++) {
+        for (unsigned int x = 0; x < m_width; x++) {
+            sf::Color pixel = image.getPixel(sf::Vector2u{x, y});
+            
+            if (pixel == sf::Color::Black) {
+                // Terrain pixels stay black
+                continue;
+            }
+            
+            if (pixel == sf::Color::White) {
+                // Cave pixels
+                if (settings.transparentCaves) {
+                    image.setPixel(sf::Vector2u{x, y}, sf::Color(0, 0, 0, 0));  // Transparent
+                } else {
+                    image.setPixel(sf::Vector2u{x, y}, sf::Color::White);  // Solid white
+                }
+            } else {
+                // Background pixels
+                if (settings.transparentBackground) {
+                    image.setPixel(sf::Vector2u{x, y}, sf::Color(0, 0, 0, 0));  // Transparent
+                } else {
+                    image.setPixel(sf::Vector2u{x, y}, sf::Color::White);  // Solid white
+                }
+            }
+        }
+    }
+    
+    return image.saveToFile(filename);
+}
+
+std::vector<uint8_t> TerrainGenerator::getTerrainData() const {
+    sf::Image image = m_terrainTexture.getTexture().copyToImage();
+    std::vector<uint8_t> data;
+    
+    // Convert to 1-bit bitmap (1 for terrain, 0 for air)
+    data.resize(m_width * m_height);
+    
+    for (unsigned int y = 0; y < m_height; y++) {
+        for (unsigned int x = 0; x < m_width; x++) {
+            sf::Color pixel = image.getPixel(sf::Vector2u{x, y});
+            // Black pixels (terrain) become 1, everything else 0
+            data[y * m_width + x] = (pixel == sf::Color(0, 0, 0)) ? 1 : 0;
+        }
+    }
+    
+    return data;
+}

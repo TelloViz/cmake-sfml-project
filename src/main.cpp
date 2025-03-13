@@ -69,7 +69,20 @@ int main() {
             }
         }
 
-        // Cave controls
+        // Blob controls
+        if (ImGui::CollapsingHeader("Blob Controls")) {
+            int blobCount = terrainGen.getBlobCount();
+            if (ImGui::SliderInt("Blob Count", &blobCount, 1, 10)) {
+                terrainGen.setBlobCount(blobCount);
+            }
+
+            float blobSpacing = terrainGen.getBlobSpacing();
+            if (ImGui::SliderFloat("Blob Spacing", &blobSpacing, 0.5f, 3.0f)) {
+                terrainGen.setBlobSpacing(blobSpacing);
+            }
+        }
+
+        // Cave controls (single section)
         if (ImGui::CollapsingHeader("Cave System")) {
             bool cavesEnabled = terrainGen.getCavesEnabled();
             if (ImGui::Checkbox("Enable Caves", &cavesEnabled)) {
@@ -97,7 +110,6 @@ int main() {
                     terrainGen.setCaveNoiseAmplitude(caveNoiseAmp);
                 }
 
-                // Individual cave editing
                 if (ImGui::TreeNode("Edit Individual Caves")) {
                     int selectedCave = terrainGen.getSelectedCaveIndex();
                     if (ImGui::SliderInt("Selected Cave", &selectedCave, -1, caveCount - 1)) {
@@ -128,30 +140,64 @@ int main() {
             }
         }
 
-        // Blob controls
-        if (ImGui::CollapsingHeader("Blob Controls")) {
-            int blobCount = terrainGen.getBlobCount();
-            if (ImGui::SliderInt("Blob Count", &blobCount, 1, 10)) {
-                terrainGen.setBlobCount(blobCount);
-            }
-
-            float blobSpacing = terrainGen.getBlobSpacing();
-            if (ImGui::SliderFloat("Blob Spacing", &blobSpacing, 0.5f, 3.0f)) {
-                terrainGen.setBlobSpacing(blobSpacing);
-            }
+        if (ImGui::CollapsingHeader("Terrain Statistics")) {
+            auto stats = terrainGen.calculateStats();
+            ImGui::Text("Visible Terrain Pixels: %u", stats.visibleTerrainPixels);
+            ImGui::Text("Terrain Coverage: %.1f%%", stats.terrainCoverage);
+            ImGui::ProgressBar(stats.terrainCoverage / 100.0f);
         }
 
-        if (ImGui::CollapsingHeader("Cave Controls")) {
-            bool cavesEnabled = terrainGen.getCavesEnabled();
-            if (ImGui::Checkbox("Enable Caves", &cavesEnabled)) {
-                terrainGen.setCavesEnabled(cavesEnabled);
+        // Export controls
+        if (ImGui::CollapsingHeader("Export")) {
+            static char filename[128] = "terrain.png";
+            static TerrainGenerator::ExportSettings exportSettings;
+            
+            ImGui::InputText("Filename", filename, IM_ARRAYSIZE(filename));
+            
+            // Background transparency option
+            ImGui::Checkbox("Transparent Background", &exportSettings.transparentBackground);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("If checked, areas outside the terrain will be transparent");
+                ImGui::EndTooltip();
             }
-
-            if (cavesEnabled) {
-                int caveCount = terrainGen.getCaveCount();
-                if (ImGui::SliderInt("Cave Count", &caveCount, 0, 10)) {
-                    terrainGen.setCaveCount(caveCount);
+            
+            // Cave transparency option
+            ImGui::Checkbox("Transparent Caves", &exportSettings.transparentCaves);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::BeginTooltip();
+                ImGui::Text("If checked, caves will be holes in the terrain\n"
+                           "If unchecked, caves will be white");
+                ImGui::EndTooltip();
+            }
+            
+            if (ImGui::Button("Save Terrain")) {
+                if (terrainGen.saveToFile(filename, exportSettings)) {
+                    ImGui::OpenPopup("Save Success");
+                } else {
+                    ImGui::OpenPopup("Save Failed");
                 }
+            }
+            
+            // Popup modals for feedback
+            if (ImGui::BeginPopupModal("Save Success", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Terrain saved successfully!");
+                if (ImGui::Button("OK")) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+            
+            if (ImGui::BeginPopupModal("Save Failed", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Failed to save terrain!");
+                if (ImGui::Button("OK")) {
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
         }
 
