@@ -226,18 +226,12 @@ void TerrainGenerator::drawMultiBlob(sf::RenderTexture& target) {
         target.draw(blob);
     }
     
+    // Draw caves as white shapes on top
     if (m_cavesEnabled && !m_caves.empty()) {
-        // Create stencil for cave cutouts with correct blend mode
-        sf::RenderStates cutoutState;
-        cutoutState.blendMode = sf::BlendMode(
-            sf::BlendMode::Factor::DstColor,
-            sf::BlendMode::Factor::OneMinusSrcColor
-        );
-        
         for (const Cave& cave : m_caves) {
             sf::ConvexShape caveBlob;
             caveBlob.setPointCount(m_cavePointCount);
-            caveBlob.setFillColor(sf::Color::White);
+            caveBlob.setFillColor(sf::Color::White);  // Simple white fill
             caveBlob.setOutlineThickness(0);
             
             float caveRadius = m_baseRadius * m_caveScale * cave.scaleVariant;
@@ -254,7 +248,7 @@ void TerrainGenerator::drawMultiBlob(sf::RenderTexture& target) {
                 caveBlob.setPoint(j, sf::Vector2f(x, y));
             }
             
-            target.draw(caveBlob, cutoutState);
+            target.draw(caveBlob); // Simple draw without blend modes
         }
     }
 }
